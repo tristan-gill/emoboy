@@ -23,6 +23,10 @@ pub enum RegFlag {
     Subtraction = 0x40, // 0b0100_0000,
     HalfCarry = 0x20,   //   0b0010_0000,
     Carry = 0x10,       //       0b0001_0000
+    Zero = 0x80,        // 0b1000_0000
+    Subtraction = 0x40, // 0b0100_0000
+    HalfCarry = 0x20,   // 0b0010_0000
+    Carry = 0x10,       // 0b0001_0000
 }
 
 pub struct Registers {
@@ -57,98 +61,99 @@ impl Registers {
 
     // TODO-TALK WITH TINT, changed to take in a &reference regbyte
     pub fn read_byte(&self, register: &RegByte) -> u8 {
-        match register {
-            RegByte::A => self.a,
-            RegByte::B => self.b,
-            RegByte::C => self.c,
-            RegByte::D => self.d,
-            RegByte::E => self.e,
-            RegByte::F => self.f,
-            RegByte::H => self.h,
-            RegByte::L => self.l,
-        }
-    }
-
-    pub fn write_byte(&mut self, register: RegByte, value: u8) {
-        match register {
-            RegByte::A => self.a = value,
-            RegByte::B => self.b = value,
-            RegByte::C => self.c = value,
-            RegByte::D => self.d = value,
-            RegByte::E => self.e = value,
-            RegByte::F => self.f = value & 0xF0, // only top half used in f
-            RegByte::H => self.h = value,
-            RegByte::L => self.l = value,
-        }
-    }
-
-    pub fn read_word(&self, register: RegWord) -> u16 {
-        match register {
-            RegWord::AF => u16::from_be_bytes([self.a, self.f]),
-            RegWord::BC => u16::from_be_bytes([self.b, self.c]),
-            RegWord::DE => u16::from_be_bytes([self.d, self.e]),
-            RegWord::HL => u16::from_be_bytes([self.h, self.l]),
-            RegWord::SP => self.sp,
-            RegWord::PC => self.pc,
-        }
-    }
-
-    pub fn write_word(&mut self, register: RegWord, value: u16) {
-        let bytes = value.to_be_bytes();
-
-        match register {
-            RegWord::AF => {
-                self.a = bytes[0];
-                self.f = bytes[1] & 0xF0; // only top half used in f
+        // TODO-TALK WITH TINT, changed to take in a &reference regbyte
+        pub fn read_byte(&self, register: &RegByte) -> u8 {
+            match register {
+                RegByte::A => self.a,
+                RegByte::B => self.b,
+                RegByte::C => self.c,
+                RegByte::D => self.d,
+                RegByte::E => self.e,
+                RegByte::F => self.f,
+                RegByte::H => self.h,
+                RegByte::L => self.l,
             }
-            RegWord::BC => {
-                self.b = bytes[0];
-                self.c = bytes[1];
+        }
+
+        pub fn write_byte(&mut self, register: RegByte, value: u8) {
+            match register {
+                RegByte::A => self.a = value,
+                RegByte::B => self.b = value,
+                RegByte::C => self.c = value,
+                RegByte::D => self.d = value,
+                RegByte::E => self.e = value,
+                RegByte::F => self.f = value & 0xF0, // only top half used in f
+                RegByte::H => self.h = value,
+                RegByte::L => self.l = value,
             }
-            RegWord::DE => {
-                self.d = bytes[0];
-                self.e = bytes[1];
+        }
+
+        pub fn read_word(&self, register: RegWord) -> u16 {
+            match register {
+                RegWord::AF => u16::from_be_bytes([self.a, self.f]),
+                RegWord::BC => u16::from_be_bytes([self.b, self.c]),
+                RegWord::DE => u16::from_be_bytes([self.d, self.e]),
+                RegWord::HL => u16::from_be_bytes([self.h, self.l]),
+                RegWord::SP => self.sp,
+                RegWord::PC => self.pc,
             }
-            RegWord::HL => {
-                self.h = bytes[0];
-                self.l = bytes[1];
+        }
+
+        pub fn write_word(&mut self, register: RegWord, value: u16) {
+            let bytes = value.to_be_bytes();
+
+            match register {
+                RegWord::AF => {
+                    self.a = bytes[0];
+                    self.f = bytes[1] & 0xF0; // only top half used in f
+                }
+                RegWord::BC => {
+                    self.b = bytes[0];
+                    self.c = bytes[1];
+                }
+                RegWord::DE => {
+                    self.d = bytes[0];
+                    self.e = bytes[1];
+                }
+                RegWord::HL => {
+                    self.h = bytes[0];
+                    self.l = bytes[1];
+                }
+                RegWord::SP => self.sp = value,
+                RegWord::PC => self.pc = value,
             }
-            RegWord::SP => self.sp = value,
-            RegWord::PC => self.pc = value,
+        }
+
+        pub fn read_flag(&self, register_flag: RegFlag) -> bool {
+            self.f & (register_flag as u8) > 0
+        }
+
+        // TODO not sure if should be `set: bool`, `value: int` ...etc
+        pub fn write_flag(&mut self, register_flag: RegFlag, value: bool) {
+            if value {
+                let mask = register_flag as u8;
+                self.f = self.f | mask;
+            } else {
+                let mask = !(register_flag as u8);
+                self.f = self.f & mask;
+            }
+        }
+
+        pub fn increment_pc(&mut self) {
+            self.pc += 1;
+        }
+        // Move to OpCode, rename to get_carry_and_update_flag
+        pub fn add_carry(&mut self) -> u8 {
+            let carry = self.read_flag(RegFlag::Carry);
+            if carry {
+                // Update carry flag has been used
+                self.write_flag(RegFlag::Carry, false);
+                return 1;
+            }
+            0
         }
     }
-
-    // TODO - reference RegFlag instead of normal RegFlag
-    pub fn read_flag(&self, register_flag: RegFlag) -> bool {
-        self.f & (register_flag as u8) > 0
-    }
-
-    // TODO not sure if should be `set: bool`, `value: int` ...etc
-    pub fn write_flag(&mut self, register_flag: RegFlag, value: bool) {
-        if value {
-            let mask = register_flag as u8;
-            self.f = self.f | mask;
-        } else {
-            let mask = !(register_flag as u8);
-            self.f = self.f & mask;
-        }
-    }
-
-    // Move to OpCode, rename to get_carry_and_update_flag
-    pub fn add_carry(&mut self) -> u8 {
-        let carry = self.read_flag(RegFlag::Carry);
-        if carry {
-            // Update carry flag has been used
-            self.write_flag(RegFlag::Carry, false);
-            return 1;
-        }
-        0
-    }
-
     // Should be called everytime we do something like fetch_byte(),
-    pub fn increment_pc(&mut self) {
-        self.pc += 1;
-    }
 }
 
 #[cfg(test)]
@@ -167,15 +172,14 @@ mod tests {
         registers.e = 0x6;
         registers.h = 0x7;
         registers.l = 0x8;
-        // TODO TALK TO TINT about &RegByte
-        assert_eq!(registers.read_byte(&RegByte::A), 0x1);
-        assert_eq!(registers.read_byte(&RegByte::F), 0x2);
-        assert_eq!(registers.read_byte(&RegByte::B), 0x3);
-        assert_eq!(registers.read_byte(&RegByte::C), 0x4);
-        assert_eq!(registers.read_byte(&RegByte::D), 0x5);
-        assert_eq!(registers.read_byte(&RegByte::E), 0x6);
-        assert_eq!(registers.read_byte(&RegByte::H), 0x7);
-        assert_eq!(registers.read_byte(&RegByte::L), 0x8);
+        assert_eq!(registers.read_byte(RegByte::A), 0x1);
+        assert_eq!(registers.read_byte(RegByte::F), 0x2);
+        assert_eq!(registers.read_byte(RegByte::B), 0x3);
+        assert_eq!(registers.read_byte(RegByte::C), 0x4);
+        assert_eq!(registers.read_byte(RegByte::D), 0x5);
+        assert_eq!(registers.read_byte(RegByte::E), 0x6);
+        assert_eq!(registers.read_byte(RegByte::H), 0x7);
+        assert_eq!(registers.read_byte(RegByte::L), 0x8);
     }
 
     #[test]

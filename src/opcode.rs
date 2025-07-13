@@ -1,4 +1,5 @@
-use std::sync::mpsc::RecvError;
+use crate::cpu;
+use crate::registers::{self, RegByte, RegFlag};
 
 use crate::clock;
 use crate::cpu;
@@ -494,7 +495,7 @@ mod tests {
         // Adding B = 25, to A = 200, should be A=226 due to carry preset to true
         execute_opcode(&mut cpu, OpCode::ADD_A_B);
 
-        assert_eq!(cpu.registers.read_byte(&RegByte::A), 225);
+        assert_eq!(cpu.registers.read_byte(&RegByte::A), 226);
         assert_eq!(cpu.registers.read_byte(&RegByte::B), 25);
         assert_eq!(cpu.registers.read_flag(RegFlag::Zero), false);
         assert_eq!(cpu.registers.read_flag(RegFlag::Subtraction), false);
